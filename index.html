@@ -346,7 +346,7 @@
       projects = [
         {
           id: generateId(), name: 'JM AAP P&C Project Tracker Template', status: 'On Track', statusReason: '',
-          projectManagers: ['James'], keyStakeholders: [], objective: 'Establish a template to use for each P&C project',
+          projectManagers: ['James'], keyStakeholders: [], successMetrics: '', objective: 'Establish a template to use for each P&C project',
           startDate: now.toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0],
           submissionDate: '', files: [], updates: [], manualProgressOverride: null,
           tasks: [
@@ -423,6 +423,7 @@
           statusReason: row.status_reason || '',
           projectManagers: row.project_managers || [],
           keyStakeholders: row.key_stakeholders || [],
+          successMetrics: row.success_metrics || '',
           objective: row.objective || '',
           startDate: row.start_date || '',
           targetFinish: row.target_finish || '',
@@ -458,6 +459,7 @@
             status_reason: project.statusReason || '',
             project_managers: project.projectManagers || [],
             key_stakeholders: project.keyStakeholders || [],
+            success_metrics: project.successMetrics || '',
             objective: project.objective || '',
             start_date: project.startDate || null,
             target_finish: project.targetFinish || null,
@@ -718,6 +720,7 @@
           <div class="field-group"><label class="field-label">Status Reason</label><input type="text" class="field-value" value="${escapeHtml(project.statusReason || '')}" onchange="updateProjectField('statusReason', this.value)"></div>
           <div class="field-group"><label class="field-label">Project Managers</label><div class="multi-select-wrapper"><input type="text" id="projectManagersDisplay" class="field-value" readonly value="${project.projectManagers.join(', ') || ''}" placeholder="Select managers..." onclick="toggleProjectManagersDropdown()"><div id="projectManagersDropdown" class="multi-select-dropdown hidden">${PROJECT_MANAGERS.map(m => `<label><input type="checkbox" value="${m}" ${project.projectManagers.includes(m) ? 'checked' : ''} onchange="updateProjectManagersFromCheckboxes()"> ${m}</label>`).join('')}</div></div></div>
           <div class="field-group"><label class="field-label">Key Stakeholders</label><input type="text" class="field-value" value="${escapeHtml((project.keyStakeholders || []).join(', '))}" placeholder="Enter stakeholders (comma-separated)" onchange="updateProjectKeyStakeholders(this.value)"></div>
+          <div class="field-group"><label class="field-label">Success Metrics</label><input type="text" class="field-value" value="${escapeHtml(project.successMetrics || '')}" placeholder="Enter success metrics" onchange="updateProjectField('successMetrics', this.value)"></div>
           <div class="field-group"><label class="field-label">Start Date</label><input type="date" class="field-value" value="${project.startDate}" onchange="updateProjectField('startDate', this.value)"></div>
           <div class="field-group"><label class="field-label">Target Finish</label><input type="date" class="field-value" value="${project.targetFinish}" onchange="updateProjectField('targetFinish', this.value)"></div>
         </div>
@@ -1045,7 +1048,7 @@
       const objective = document.getElementById('newProjectObjective').value.trim();
       const managers = Array.from(document.getElementById('newProjectManagers').selectedOptions).map(o => o.value);
       const now = new Date(); const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const newProject = { id: generateId(), name, status: 'On Track', statusReason: '', projectManagers: managers.length > 0 ? managers : [], keyStakeholders: [], objective, startDate: now.toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0], submissionDate: '', files: [], updates: [], tasks: [], manualProgressOverride: null };
+      const newProject = { id: generateId(), name, status: 'On Track', statusReason: '', projectManagers: managers.length > 0 ? managers : [], keyStakeholders: [], successMetrics: '', objective, startDate: now.toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0], submissionDate: '', files: [], updates: [], tasks: [], manualProgressOverride: null };
       projects.push(newProject);
       await saveSingleProject(newProject);
       closeAddProjectModal(); 
