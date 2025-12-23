@@ -101,6 +101,21 @@
     .gantt-task-bar-container { flex: 1; position: relative; height: 50px; }
     .gantt-task-bar { position: absolute; height: 40px; background: #4299e1; border-radius: 4px; display: flex; align-items: center; padding: 0 0.5rem; font-size: 0.85rem; color: white; cursor: pointer; top: 5px; }
     .gantt-task-bar:hover { background: #3182ce; }
+    .calendar-view { display: flex; flex-direction: column; }
+    .calendar-month { margin-bottom: 2rem; }
+    .calendar-month-header { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem; color: #1a202c; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .calendar-day-header { background: #f7fafc; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.75rem; color: #4a5568; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+    .calendar-day-header:last-child { border-right: none; }
+    .calendar-day { min-height: 60px; padding: 0.25rem; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; background: white; position: relative; }
+    .calendar-day:last-child { border-right: none; }
+    .calendar-day.other-month { background: #f7fafc; color: #a0aec0; }
+    .calendar-day-number { font-size: 0.75rem; color: #2d3748; margin-bottom: 0.25rem; }
+    .calendar-day.today { background: #ebf8ff; }
+    .calendar-day.today .calendar-day-number { font-weight: 600; color: #3182ce; }
+    .calendar-project-bar { position: absolute; height: 20px; background: #4299e1; border-radius: 2px; top: 20px; left: 2px; right: 2px; font-size: 0.7rem; color: white; display: flex; align-items: center; padding: 0 0.25rem; cursor: pointer; overflow: hidden; white-space: nowrap; }
+    .calendar-project-bar:hover { background: #3182ce; }
+    .calendar-project-bar.multi-day { position: absolute; }
     .kanban-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; background: white; padding: 1rem; border-radius: 8px; }
     .kanban-column { background: #f7fafc; border-radius: 6px; padding: 1rem; min-height: 500px; }
     .kanban-header { font-weight: 600; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #cbd5e0; }
@@ -1008,27 +1023,22 @@
       if (projects.length === 0) { document.getElementById('ganttContainer').innerHTML = '<p>No projects to display.</p>'; return; }
       const projectsWithDates = projects.filter(p => p.startDate && p.targetFinish);
       if (projectsWithDates.length === 0) { document.getElementById('ganttContainer').innerHTML = '<p>No projects with complete dates to display.</p>'; return; }
+      
+      if (ganttViewType === 'monthly') {
+        renderCalendarView(projectsWithDates);
+      } else {
+        renderBiweeklyView(projectsWithDates);
+      }
+    }
+    
+    function renderBiweeklyView(projectsWithDates) {
       const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
       let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime()))); 
       let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
       
-      // Calculate increment based on view type
-      let incrementDays, incrementLabel;
-      if (ganttViewType === 'biweekly') {
-        incrementDays = 14; // 2 weeks
-        incrementLabel = '2 weeks';
-        minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000); // Add 1 week buffer
-        maxDate = new Date(maxDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-      } else { // monthly
-        incrementDays = 30; // ~1 month
-        incrementLabel = 'month';
-        // Round to start of month
-        minDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-        maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
-        // Add buffer months
-        minDate = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
-        maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
-      }
+      const incrementDays = 14; // 2 weeks
+      minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000); // Add 1 week buffer
+      maxDate = new Date(maxDate.getTime() + 7 * 24 * 60 * 60 * 1000);
       
       const totalDays = Math.ceil((maxDate - minDate) / (24 * 60 * 60 * 1000));
       const increments = Math.ceil(totalDays / incrementDays);
@@ -1039,13 +1049,7 @@
       // Generate header increments
       for (let i = 0; i < increments; i++) {
         const incrementStart = new Date(minDate.getTime() + i * incrementDays * 24 * 60 * 60 * 1000);
-        let label;
-        if (ganttViewType === 'biweekly') {
-          label = formatDate(incrementStart.toISOString().split('T')[0]);
-        } else {
-          // Monthly view - show month and year
-          label = incrementStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        }
+        const label = formatDate(incrementStart.toISOString().split('T')[0]);
         html += `<div class="gantt-day" style="min-width: ${incrementWidth}px;">${label}</div>`;
       }
       
@@ -1065,6 +1069,123 @@
       
       html += '</div>';
       document.getElementById('ganttContainer').innerHTML = html;
+    }
+    
+    function renderCalendarView(projectsWithDates) {
+      const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
+      let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime())));
+      let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
+      
+      // Round to start/end of months
+      minDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+      maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+      // Add buffer months
+      minDate = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+      maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      let html = '<div class="calendar-view">';
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      
+      // Generate calendar for each month
+      let currentMonth = new Date(minDate);
+      while (currentMonth <= maxDate) {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startDayOfWeek = firstDay.getDay();
+        
+        html += `<div class="calendar-month">`;
+        html += `<div class="calendar-month-header">${firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div>`;
+        html += `<div class="calendar-grid">`;
+        
+        // Day headers
+        dayNames.forEach(day => {
+          html += `<div class="calendar-day-header">${day}</div>`;
+        });
+        
+        // Empty cells for days before month starts
+        for (let i = 0; i < startDayOfWeek; i++) {
+          const prevMonthDate = new Date(year, month, -i);
+          html += `<div class="calendar-day other-month"><div class="calendar-day-number">${prevMonthDate.getDate()}</div></div>`;
+        }
+        
+        // Days of the month
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(year, month, day);
+          date.setHours(0, 0, 0, 0);
+          const isToday = date.getTime() === today.getTime();
+          const dateStr = date.toISOString().split('T')[0];
+          
+          html += `<div class="calendar-day ${isToday ? 'today' : ''}" data-date="${dateStr}">`;
+          html += `<div class="calendar-day-number">${day}</div>`;
+          
+          // Add project bars for this day
+          projectsWithDates.forEach((project, idx) => {
+            const projectStart = new Date(project.startDate);
+            projectStart.setHours(0, 0, 0, 0);
+            const projectEnd = new Date(project.targetFinish);
+            projectEnd.setHours(0, 0, 0, 0);
+            
+            if (date >= projectStart && date <= projectEnd) {
+              const isFirstDay = date.getTime() === projectStart.getTime();
+              const isLastDay = date.getTime() === projectEnd.getTime();
+              const dayWidth = 100 / 7; // Percentage per day
+              let left = 0;
+              let width = dayWidth;
+              
+              if (isFirstDay && !isLastDay) {
+                // Multi-day project starting
+                width = dayWidth;
+                left = 0;
+              } else if (!isFirstDay && isLastDay) {
+                // Multi-day project ending
+                width = dayWidth;
+                left = 0;
+              } else if (isFirstDay && isLastDay) {
+                // Single day project
+                width = dayWidth;
+                left = 0;
+              } else {
+                // Middle day of multi-day project
+                width = dayWidth;
+                left = 0;
+              }
+              
+              const barStyle = `left: ${left}%; width: ${width}%; background: ${getProjectColor(idx)};`;
+              html += `<div class="calendar-project-bar ${!isFirstDay && !isLastDay ? 'multi-day' : ''}" style="${barStyle}" onclick="openProject('${project.id}');" title="${escapeHtml(project.name)}">${isFirstDay ? escapeHtml(project.name) : ''}</div>`;
+            }
+          });
+          
+          html += `</div>`;
+        }
+        
+        // Empty cells for days after month ends
+        const remainingCells = 7 - ((startDayOfWeek + daysInMonth) % 7);
+        if (remainingCells < 7) {
+          for (let i = 1; i <= remainingCells; i++) {
+            const nextMonthDate = new Date(year, month + 1, i);
+            html += `<div class="calendar-day other-month"><div class="calendar-day-number">${nextMonthDate.getDate()}</div></div>`;
+          }
+        }
+        
+        html += `</div></div>`;
+        
+        // Move to next month
+        currentMonth = new Date(year, month + 1, 1);
+      }
+      
+      html += '</div>';
+      document.getElementById('ganttContainer').innerHTML = html;
+    }
+    
+    function getProjectColor(index) {
+      const colors = ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f56565', '#38b2ac', '#ed64a6'];
+      return colors[index % colors.length];
     }
     
     async function renderKanban() {
