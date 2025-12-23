@@ -331,10 +331,7 @@
       document.getElementById('logoContainer').innerHTML = logoSVG;
       showLoading('Loading projects...');
       await loadProjects();
-      if (projects.length === 0) {
-        initSeedData();
-        await saveProjects();
-      }
+      // Removed auto-seed data - start with empty database
       projects.forEach(project => { if (!project.startDate || !project.targetFinish) project.status = 'Backlog'; });
       hideLoading();
       renderDashboard();
