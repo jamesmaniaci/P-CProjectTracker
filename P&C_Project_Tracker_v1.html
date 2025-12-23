@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AV P&C Project Tracker</title>
+  
+  <!-- Google Fonts: Archivo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Supabase Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f5f7fa; color: #2d3748; line-height: 1.6; }
+    h1, h2, h3, h4, h5, h6 { font-family: 'Archivo', sans-serif; font-weight: 600; }
+    .header { background: white; border-bottom: 2px solid #e2e8f0; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .logo { width: 48px; height: 48px; }
+    .header h1 { font-size: 1.5rem; color: #1a202c; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .view-toggle { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .btn { padding: 0.5rem 1rem; border: 1px solid #cbd5e0; background: white; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+    .btn:hover { background: #edf2f7; }
+    .btn-primary { background: #3182ce; color: white; border-color: #3182ce; }
+    .btn-primary:hover { background: #2c5282; }
+    .btn.active { background: #3182ce; color: white; border-color: #3182ce; }
+    .btn-small { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+    .btn-danger { background: #e53e3e; color: white; border-color: #e53e3e; }
+    .btn-danger:hover { background: #c53030; }
+    .filters { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .filter-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+    .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .filter-group label { font-size: 0.8rem; font-weight: 600; color: #4a5568; }
+    input[type="text"], input[type="date"], select, textarea { padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 0.9rem; }
+    input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus { outline: none; border-color: #3182ce; box-shadow: 0 0 0 3px rgba(49,130,206,0.1); }
+    .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
+    .project-card { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s; }
+    .project-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+    .project-card.complete { background: #f0fff4; border: 2px solid #48bb78; }
+    .project-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+    .project-title { font-size: 1.1rem; font-weight: 600; color: #1a202c; }
+    .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+    .status-on-track { background: #c6f6d5; color: #22543d; }
+    .status-delayed { background: #feebc8; color: #7c2d12; }
+    .status-problem { background: #fed7d7; color: #742a2a; }
+    .status-complete { background: #48bb78; color: white; }
+    .status-backlog { background: #e2e8f0; color: #4a5568; }
+    .project-managers { font-size: 0.85rem; color: #4a5568; margin-bottom: 0.5rem; }
+    .progress-bar-container { background: #e2e8f0; height: 8px; border-radius: 4px; margin: 0.75rem 0; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: #48bb78; transition: width 0.3s; }
+    .progress-text { font-size: 0.85rem; color: #4a5568; margin-top: 0.25rem; }
+    .project-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+    .target-date { font-size: 0.85rem; color: #718096; }
+    .project-detail { background: white; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; gap: 1rem; }
+    .detail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .metadata-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .field-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .field-label { font-size: 0.85rem; font-weight: 600; color: #4a5568; }
+    .field-value { padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; background: white; }
+    .editable-title { font-size: 1.5rem; font-weight: 700; border: 2px solid transparent; padding: 0.25rem; border-radius: 4px; }
+    .editable-title:focus { outline: none; border-color: #3182ce; background: #f7fafc; }
+    .problem-banner { background: #fed7d7; border: 2px solid #e53e3e; color: #742a2a; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-weight: 600; }
+    .progress-control { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+    .manual-badge { background: #bee3f8; color: #2c5282; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+    .section { margin-bottom: 2rem; }
+    .section-title { font-size: 1.2rem; margin-bottom: 1rem; color: #1a202c; }
+    .task-list { list-style: none; }
+    .task-item { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem; }
+    .task-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .task-checkbox { width: 20px; height: 20px; cursor: pointer; }
+    .task-label { font-weight: 600; color: #2d3748; min-width: 30px; }
+    .task-title-input { flex: 1; border: 1px solid transparent; background: transparent; font-size: 1rem; padding: 0.25rem; }
+    .task-title-input:focus { border-color: #3182ce; background: white; outline: none; border-radius: 4px; }
+    .task-actions { display: flex; gap: 0.5rem; }
+    .task-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+    .task-detail-field { display: flex; flex-direction: column; gap: 0.25rem; }
+    .task-detail-label { font-size: 0.75rem; color: #718096; font-weight: 600; }
+    .subtasks { margin-left: 2rem; margin-top: 0.75rem; border-left: 2px solid #cbd5e0; padding-left: 1rem; }
+    .subtasks .task-item { background: white; }
+    .collapse-btn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; color: #4a5568; }
+    .updates-list { max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; background: #f7fafc; }
+    .update-item { background: white; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.75rem; border-left: 3px solid #3182ce; }
+    .update-date { font-size: 0.75rem; color: #718096; margin-bottom: 0.25rem; }
+    .update-text { color: #2d3748; }
+    .files-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; }
+    .file-title { font-weight: 600; color: #2d3748; }
+    .file-actions { display: flex; gap: 0.5rem; }
+    .gantt-container { overflow-x: auto; background: white; padding: 1rem; border-radius: 8px; }
+    .gantt-chart { min-width: 800px; }
+    .gantt-header { display: flex; border-bottom: 2px solid #cbd5e0; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .gantt-labels { width: 200px; flex-shrink: 0; }
+    .gantt-timeline { flex: 1; display: flex; }
+    .gantt-day { flex: 1; text-align: center; font-size: 0.75rem; color: #718096; border-left: 1px solid #e2e8f0; padding: 0.25rem; }
+    .gantt-row { display: flex; align-items: center; min-height: 60px; border-bottom: 1px solid #e2e8f0; }
+    .gantt-task-label { width: 200px; flex-shrink: 0; padding: 0.5rem; font-size: 0.85rem; }
+    .gantt-task-bar-container { flex: 1; position: relative; height: 50px; }
+    .gantt-task-bar { position: absolute; height: 40px; background: #4299e1; border-radius: 4px; display: flex; align-items: center; padding: 0 0.5rem; font-size: 0.85rem; color: white; cursor: pointer; top: 5px; }
+    .gantt-task-bar:hover { background: #3182ce; }
+    .kanban-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; background: white; padding: 1rem; border-radius: 8px; }
+    .kanban-column { background: #f7fafc; border-radius: 6px; padding: 1rem; min-height: 500px; }
+    .kanban-header { font-weight: 600; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #cbd5e0; }
+    .kanban-card { background: white; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.75rem; margin-bottom: 0.75rem; cursor: move; }
+    .kanban-card:hover { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .kanban-card-title { font-weight: 600; margin-bottom: 0.5rem; color: #2d3748; }
+    .kanban-card-meta { font-size: 0.75rem; color: #718096; display: flex; justify-content: space-between; }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 8px; padding: 2rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .modal-title { font-size: 1.25rem; font-weight: 600; }
+    .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #718096; }
+    textarea { width: 100%; min-height: 100px; resize: vertical; }
+    .legend { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .legend-title { font-weight: 600; margin-bottom: 0.5rem; }
+    .legend-items { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+    .legend-color { width: 20px; height: 20px; border-radius: 4px; }
+    .hidden { display: none; }
+    select[multiple] { height: auto; min-height: 80px; }
+    .multi-select-wrapper { position: relative; }
+    .multi-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e0; border-radius: 4px; margin-top: 0.25rem; padding: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 100; max-height: 200px; overflow-y: auto; }
+    .multi-select-dropdown label { display: block; padding: 0.5rem; cursor: pointer; font-weight: normal; }
+    .multi-select-dropdown label:hover { background: #f7fafc; }
+    .multi-select-dropdown input[type="checkbox"] { margin-right: 0.5rem; }
+    @media (max-width: 768px) { .container { padding: 1rem; } .project-grid { grid-template-columns: 1fr; } .kanban-board { grid-template-columns: 1fr; } .metadata-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo" id="logoContainer"></div>
+    <h1>AV P&C Project Tracker</h1>
+  </div>
+  
+  <div class="container">
+    <div class="view-toggle">
+      <button class="btn active" onclick="switchView('dashboard')" id="dashboardBtn">Dashboard</button>
+      <button class="btn" onclick="switchView('gantt')" id="ganttBtn">Gantt View</button>
+      <button class="btn" onclick="switchView('kanban')" id="kanbanBtn">Kanban View</button>
+    </div>
+    
+    <div id="dashboardView">
+      <div class="legend">
+        <div class="legend-title">Status Legend</div>
+        <div class="legend-items">
+          <div class="legend-item"><div class="legend-color" style="background: #c6f6d5;"></div><span>On Track</span></div>
+          <div class="legend-item"><div class="legend-color" style="background: #feebc8;"></div><span>Delayed</span></div>
+          <div class="legend-item"><div class="legend-color" style="background: #fed7d7;"></div><span>Problem</span></div>
+          <div class="legend-item"><div class="legend-color" style="background: #48bb78;"></div><span>Fully Complete</span></div>
+          <div class="legend-item"><div class="legend-color" style="background: #e2e8f0;"></div><span>Backlog</span></div>
+        </div>
+      </div>
+      
+      <div class="filters">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label for="searchInput">Search</label>
+            <input type="text" id="searchInput" placeholder="Project name..." oninput="filterProjects()">
+          </div>
+          <div class="filter-group">
+            <label for="statusFilter">Status</label>
+            <select id="statusFilter" onchange="filterProjects()">
+              <option value="">-</option>
+              <option value="Backlog">Backlog</option>
+              <option value="On Track">On Track</option>
+              <option value="Delayed">Delayed</option>
+              <option value="Problem">Problem</option>
+              <option value="Fully Complete">Fully Complete</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="managerFilter">Manager</label>
+            <div class="multi-select-wrapper">
+              <input type="text" id="managerFilterDisplay" readonly placeholder="Select managers..." onclick="toggleManagerFilter()">
+              <div id="managerFilterDropdown" class="multi-select-dropdown hidden">
+                <label><input type="checkbox" value="James" onchange="updateManagerFilter()"> James</label>
+                <label><input type="checkbox" value="Kara" onchange="updateManagerFilter()"> Kara</label>
+                <label><input type="checkbox" value="Jen" onchange="updateManagerFilter()"> Jen</label>
+                <label><input type="checkbox" value="Sarah" onchange="updateManagerFilter()"> Sarah</label>
+              </div>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label for="dateFromFilter">From</label>
+            <input type="date" id="dateFromFilter" onchange="filterProjects()">
+          </div>
+          <div class="filter-group">
+            <label for="dateToFilter">To</label>
+            <input type="date" id="dateToFilter" onchange="filterProjects()">
+          </div>
+          <div class="filter-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" onclick="showAddProjectModal()">+ New Project</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="project-grid" id="projectGrid"></div>
+    </div>
+    
+    <div id="plannerView" class="hidden">
+      <div class="project-detail" id="projectDetail"></div>
+    </div>
+    
+    <div id="ganttView" class="hidden">
+      <div class="gantt-container" id="ganttContainer"></div>
+    </div>
+    
+    <div id="kanbanView" class="hidden">
+      <div class="kanban-board" id="kanbanBoard"></div>
+    </div>
+  </div>
+  
+  <div id="confirmModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Confirm</h3>
+        <button class="close-modal" onclick="closeConfirmModal()">&times;</button>
+      </div>
+      <p id="confirmMessage"></p>
+      <div style="display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end;">
+        <button class="btn" onclick="closeConfirmModal()">Cancel</button>
+        <button class="btn btn-primary" id="confirmYes">Yes</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="taskEditModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Task Details</h3>
+        <button class="close-modal" onclick="closeTaskEditModal()">&times;</button>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Description</label>
+        <textarea id="taskDescription"></textarea>
+      </div>
+      <div class="field-group" style="margin-top: 1rem;">
+        <label class="field-label">Success Criteria (Metrics & KPIs)</label>
+        <textarea id="taskSuccessCriteria" placeholder="Enter relevant metrics and KPIs for this task..."></textarea>
+      </div>
+      <div class="field-group" style="margin-top: 1rem;">
+        <label class="field-label">Tags (comma-separated)</label>
+        <input type="text" id="taskTags">
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end;">
+        <button class="btn" onclick="closeTaskEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTaskEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="addProjectModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Add New Project</h3>
+        <button class="close-modal" onclick="closeAddProjectModal()">&times;</button>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Project Name</label>
+        <input type="text" id="newProjectName" placeholder="Enter project name">
+      </div>
+      <div class="field-group" style="margin-top: 1rem;">
+        <label class="field-label">Objective</label>
+        <textarea id="newProjectObjective" placeholder="Enter project objective"></textarea>
+      </div>
+      <div class="field-group" style="margin-top: 1rem;">
+        <label class="field-label">Project Managers</label>
+        <select id="newProjectManagers" multiple>
+          <option value="James">James</option>
+          <option value="Kara">Kara</option>
+          <option value="Jen">Jen</option>
+          <option value="Sarah">Sarah</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end;">
+        <button class="btn" onclick="closeAddProjectModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="createNewProject()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // SUPABASE CONFIGURATION
+    // ============================================
+    // Replace these with your Supabase credentials from Settings → API
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // e.g., 'https://xxxxx.supabase.co'
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Your anon/public key
+    
+    // Validate configuration
+    if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+      console.error('⚠️ Supabase not configured! Please add your Supabase URL and anon key in the script section.');
+      alert('⚠️ Supabase not configured!\n\nPlease:\n1. Open this file in an editor\n2. Find the SUPABASE_URL and SUPABASE_ANON_KEY constants\n3. Replace them with your credentials from Supabase Settings → API');
+    }
+    
+    // Initialize Supabase client
+    let supabaseClient = null;
+    try {
+      if (typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      } else {
+        console.error('Supabase library not loaded. Check that the CDN script is included.');
+      }
+    } catch (error) {
+      console.error('Error initializing Supabase:', error);
+    }
+    
+    // ============================================
+    // APPLICATION STATE
+    // ============================================
+    const PROJECT_MANAGERS = ['James', 'Kara', 'Jen', 'Sarah'];
+    
+    let projects = [];
+    let currentProjectId = null;
+    let currentView = 'dashboard';
+    let currentTaskEdit = null;
+    let selectedManagers = [];
+    let isLoading = false;
+    
+    const logoSVG = `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="8" fill="#3182CE"/><path d="M24 10L34 30H28L24 22L20 30H14L24 10Z" fill="white"/><path d="M18 34L24 38L30 34H18Z" fill="white"/></svg>`;
+    
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    async function init() {
+      document.getElementById('logoContainer').innerHTML = logoSVG;
+      showLoading('Loading projects...');
+      await loadProjects();
+      if (projects.length === 0) {
+        initSeedData();
+        await saveProjects();
+      }
+      projects.forEach(project => { if (!project.startDate || !project.targetFinish) project.status = 'Backlog'; });
+      hideLoading();
+      renderDashboard();
+      
+      // Set up real-time subscription for team collaboration
+      setupRealtimeSubscription();
+    }
+    
+    function initSeedData() {
+      const now = new Date();
+      const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      projects = [
+        {
+          id: generateId(), name: 'JM AAP P&C Project Tracker Template', status: 'On Track', statusReason: '',
+          projectManagers: ['James'], keyStakeholders: [], objective: 'Establish a template to use for each P&C project',
+          startDate: now.toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0],
+          submissionDate: '', files: [], updates: [], manualProgressOverride: null,
+          tasks: [
+            { id: generateId(), autoLabel: '1', title: 'Establish template structure', description: '', assignee: '',
+              startDate: now.toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0],
+              status: 'To Do', priority: 'High', tags: [], successCriteria: '',
+              subtasks: [
+                { id: generateId(), autoLabel: '1a', title: 'Define TOC', description: '', assignee: '', startDate: now.toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'To Do', priority: 'Medium', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() },
+                { id: generateId(), autoLabel: '1b', title: 'Build template', description: '', assignee: '', startDate: new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'To Do', priority: 'High', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() },
+                { id: generateId(), autoLabel: '1c', title: 'Review with team', description: '', assignee: '', startDate: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0], status: 'To Do', priority: 'Medium', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() }
+              ], createdAt: now.toISOString(), updatedAt: now.toISOString()
+            },
+            { id: generateId(), autoLabel: '2', title: 'Pilot template on 1 project', description: '', assignee: '',
+              startDate: futureDate.toISOString().split('T')[0], targetFinish: new Date(futureDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              status: 'Backlog', priority: 'Medium', tags: [], successCriteria: '',
+              subtasks: [
+                { id: generateId(), autoLabel: '2a', title: 'Select pilot', description: '', assignee: '', startDate: futureDate.toISOString().split('T')[0], targetFinish: new Date(futureDate.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Backlog', priority: 'Low', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() },
+                { id: generateId(), autoLabel: '2b', title: 'Run pilot', description: '', assignee: '', startDate: new Date(futureDate.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], targetFinish: new Date(futureDate.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Backlog', priority: 'Medium', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() },
+                { id: generateId(), autoLabel: '2c', title: 'Collect feedback', description: '', assignee: '', startDate: new Date(futureDate.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], targetFinish: new Date(futureDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Backlog', priority: 'Medium', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() }
+              ], createdAt: now.toISOString(), updatedAt: now.toISOString()
+            }
+          ]
+        },
+        {
+          id: generateId(), name: 'ChartHop/Greenhouse Report', status: 'On Track', statusReason: '',
+          projectManagers: ['James'], keyStakeholders: [], objective: 'Evaluate whether Alumni Ventures should consolidate onboarding processes from ChartHop into Greenhouse.',
+          startDate: now.toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          submissionDate: '', files: [], updates: [], manualProgressOverride: null,
+          tasks: [
+            { id: generateId(), autoLabel: '1', title: 'Evaluate Greenhouse vs ChartHop', description: '', assignee: '',
+              startDate: now.toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              status: 'In Progress', priority: 'High', tags: [], successCriteria: '',
+              subtasks: [
+                { id: generateId(), autoLabel: '1a', title: 'Compile research', description: '', assignee: '', startDate: now.toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Done', priority: 'High', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() },
+                { id: generateId(), autoLabel: '1b', title: 'Evaluate feature gaps', description: '', assignee: '', startDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'In Progress', priority: 'High', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() },
+                { id: generateId(), autoLabel: '1c', title: 'Prepare meeting & presentation', description: '', assignee: '', startDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], targetFinish: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'To Do', priority: 'Medium', tags: [], subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() }
+              ], createdAt: now.toISOString(), updatedAt: now.toISOString()
+            }
+          ]
+        }
+      ];
+      saveProjects();
+    }
+    
+    // ============================================
+    // SUPABASE DATABASE FUNCTIONS
+    // ============================================
+    async function loadProjects() {
+      if (!supabaseClient) {
+        console.error('Supabase client not initialized');
+        projects = [];
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabaseClient
+          .from('projects')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error loading projects:', error);
+          showError('Failed to load projects. Check console for details.');
+          // Fallback to empty array
+          projects = [];
+          return;
+        }
+        
+        // Convert database format to app format
+        projects = (data || []).map(row => ({
+          id: row.id,
+          name: row.name,
+          status: row.status,
+          statusReason: row.status_reason || '',
+          projectManagers: row.project_managers || [],
+          keyStakeholders: row.key_stakeholders || [],
+          objective: row.objective || '',
+          startDate: row.start_date || '',
+          targetFinish: row.target_finish || '',
+          submissionDate: row.submission_date || '',
+          manualProgressOverride: row.manual_progress_override,
+          tasks: row.data?.tasks || [],
+          files: row.data?.files || [],
+          updates: row.data?.updates || []
+        }));
+      } catch (err) {
+        console.error('Unexpected error loading projects:', err);
+        showError('Failed to load projects. Please refresh the page.');
+        projects = [];
+      }
+    }
+    
+    async function saveProjects() {
+      if (!supabaseClient) {
+        console.error('Supabase client not initialized');
+        return;
+      }
+      
+      if (isLoading) return; // Prevent concurrent saves
+      isLoading = true;
+      
+      try {
+        // Convert app format to database format and save each project
+        const savePromises = projects.map(async (project) => {
+          const dbRow = {
+            id: project.id,
+            name: project.name,
+            status: project.status,
+            status_reason: project.statusReason || '',
+            project_managers: project.projectManagers || [],
+            key_stakeholders: project.keyStakeholders || [],
+            objective: project.objective || '',
+            start_date: project.startDate || null,
+            target_finish: project.targetFinish || null,
+            submission_date: project.submissionDate || null,
+            manual_progress_override: project.manualProgressOverride,
+            data: {
+              tasks: project.tasks || [],
+              files: project.files || [],
+              updates: project.updates || []
+            }
+          };
+          
+          // Use upsert to insert or update
+          const { error } = await supabaseClient
+            .from('projects')
+            .upsert(dbRow, { onConflict: 'id' });
+          
+          if (error) {
+            console.error(`Error saving project ${project.id}:`, error);
+            throw error;
+          }
+        });
+        
+        await Promise.all(savePromises);
+      } catch (err) {
+        console.error('Error saving projects:', err);
+        showError('Failed to save changes. Please try again.');
+        throw err;
+      } finally {
+        isLoading = false;
+      }
+    }
+    
+    async function saveSingleProject(project) {
+      if (!supabaseClient) {
+        console.error('Supabase client not initialized');
+        return false;
+      }
+      
+      try {
+        const dbRow = {
+          id: project.id,
+          name: project.name,
+          status: project.status,
+          status_reason: project.statusReason || '',
+          project_managers: project.projectManagers || [],
+          key_stakeholders: project.keyStakeholders || [],
+          objective: project.objective || '',
+          start_date: project.startDate || null,
+          target_finish: project.targetFinish || null,
+          submission_date: project.submissionDate || null,
+          manual_progress_override: project.manualProgressOverride,
+          data: {
+            tasks: project.tasks || [],
+            files: project.files || [],
+            updates: project.updates || []
+          }
+        };
+        
+        const { error } = await supabaseClient
+          .from('projects')
+          .upsert(dbRow, { onConflict: 'id' });
+        
+        if (error) {
+          console.error('Error saving project:', error);
+          showError('Failed to save project. Please try again.');
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error('Unexpected error saving project:', err);
+        showError('Failed to save project. Please refresh the page.');
+        return false;
+      }
+    }
+    
+    function setupRealtimeSubscription() {
+      if (!supabaseClient) {
+        console.warn('Supabase client not initialized, skipping realtime subscription');
+        return;
+      }
+      
+      // Subscribe to changes so team members see updates in real-time
+      supabaseClient
+        .channel('projects-changes')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'projects' },
+          async (payload) => {
+            console.log('Project changed:', payload);
+            // Reload projects when someone else makes a change
+            if (currentView === 'dashboard') {
+              await loadProjects();
+              renderDashboard();
+            } else if (currentProjectId === payload.new?.id || currentProjectId === payload.old?.id) {
+              await loadProjects();
+              renderProjectDetail();
+            }
+          }
+        )
+        .subscribe();
+    }
+    
+    function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+    
+    // ============================================
+    // UI HELPER FUNCTIONS
+    // ============================================
+    function showLoading(message) {
+      const existing = document.getElementById('loadingOverlay');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'loadingOverlay';
+      overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; color: white; font-size: 1.2rem;';
+      overlay.innerHTML = `<div>${message || 'Loading...'}</div>`;
+      document.body.appendChild(overlay);
+    }
+    
+    function hideLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) overlay.remove();
+    }
+    
+    function showError(message) {
+      alert(message); // Simple alert for now, can be improved with a modal
+    }
+    
+    function switchView(view) {
+      currentView = view;
+      document.getElementById('dashboardView').classList.toggle('hidden', view !== 'dashboard');
+      document.getElementById('plannerView').classList.toggle('hidden', view !== 'planner');
+      document.getElementById('ganttView').classList.toggle('hidden', view !== 'gantt');
+      document.getElementById('kanbanView').classList.toggle('hidden', view !== 'kanban');
+      document.getElementById('dashboardBtn').classList.toggle('active', view === 'dashboard');
+      if (document.getElementById('ganttBtn')) document.getElementById('ganttBtn').classList.toggle('active', view === 'gantt');
+      if (document.getElementById('kanbanBtn')) document.getElementById('kanbanBtn').classList.toggle('active', view === 'kanban');
+      if (view === 'dashboard') renderDashboard();
+      else if (view === 'planner') { if (currentProjectId) renderProjectDetail(); else document.getElementById('projectDetail').innerHTML = '<p>No projects available.</p>'; }
+      else if (view === 'gantt') renderGantt();
+      else if (view === 'kanban') renderKanban();
+    }
+    
+    function toggleManagerFilter() { document.getElementById('managerFilterDropdown').classList.toggle('hidden'); }
+    
+    function updateManagerFilter() {
+      const checkboxes = document.querySelectorAll('#managerFilterDropdown input[type="checkbox"]');
+      selectedManagers = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+      const display = document.getElementById('managerFilterDisplay');
+      display.value = selectedManagers.length === 0 ? '' : selectedManagers.join(', ');
+      document.addEventListener('click', function closeDropdown(e) { if (!e.target.closest('.multi-select-wrapper')) { document.getElementById('managerFilterDropdown').classList.add('hidden'); document.removeEventListener('click', closeDropdown); } });
+      filterProjects();
+    }
+    
+    function filterProjects() { renderDashboard(); }
+    
+    function renderDashboard() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+      const dateFrom = document.getElementById('dateFromFilter').value;
+      const dateTo = document.getElementById('dateToFilter').value;
+      const filtered = projects.filter(project => {
+        if (searchTerm && !project.name.toLowerCase().includes(searchTerm)) return false;
+        if (statusFilter && project.status !== statusFilter) return false;
+        if (selectedManagers.length > 0 && !selectedManagers.some(m => project.projectManagers.includes(m))) return false;
+        if (dateFrom && project.targetFinish < dateFrom) return false;
+        if (dateTo && project.targetFinish > dateTo) return false;
+        return true;
+      });
+      const grid = document.getElementById('projectGrid');
+      grid.innerHTML = '';
+      filtered.forEach(project => {
+        const card = document.createElement('div');
+        card.className = 'project-card' + (project.status === 'Fully Complete' ? ' complete' : '');
+        const progress = calculateProgress(project);
+        card.innerHTML = `
+          <div class="project-header"><h3 class="project-title">${escapeHtml(project.name)}</h3><span class="status-badge ${getStatusClass(project.status)}">${project.status}</span></div>
+          <div class="project-managers"><strong>PM:</strong> ${project.projectManagers.join(', ')}</div>
+          <div class="progress-bar-container"><div class="progress-bar-fill" style="width: ${progress}%"></div></div>
+          <div class="progress-text">${progress}% Complete</div>
+          <div class="project-footer">
+            <span class="target-date">Target: ${formatDate(project.targetFinish)}</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-small btn-primary" onclick="openProject('${project.id}')">Open Project</button>
+              <button class="btn btn-small btn-danger" onclick="deleteProject('${project.id}')" title="Delete Project">🗑</button>
+            </div>
+          </div>`;
+        grid.appendChild(card);
+      });
+    }
+    
+    function calculateProgress(project) {
+      if (project.manualProgressOverride !== null) return project.manualProgressOverride;
+      const allTasks = getAllTasks(project.tasks || []);
+      if (allTasks.length === 0) return 0;
+      const doneTasks = allTasks.filter(t => t.status === 'Done').length;
+      return Math.round(Math.round((doneTasks / allTasks.length) * 100) / 10) * 10;
+    }
+    
+    function getAllTasks(tasks) {
+      let result = [];
+      tasks.forEach(task => { result.push(task); if (task.subtasks && task.subtasks.length > 0) result = result.concat(getAllTasks(task.subtasks)); });
+      return result;
+    }
+    
+    function getStatusClass(status) {
+      const map = { 'Backlog': 'status-backlog', 'On Track': 'status-on-track', 'Delayed': 'status-delayed', 'Problem': 'status-problem', 'Fully Complete': 'status-complete' };
+      return map[status] || '';
+    }
+    
+    function openProject(projectId) { currentProjectId = projectId; switchView('planner'); }
+    
+    async function deleteProject(projectId) {
+      if (!supabaseClient) {
+        console.error('Supabase client not initialized');
+        return;
+      }
+      
+      const project = projects.find(p => p.id === projectId);
+      if (!project) return;
+      if (confirm(`Are you sure you want to delete the project "${project.name}"? This action cannot be undone.`)) {
+        // Delete from Supabase
+        const { error } = await supabaseClient
+          .from('projects')
+          .delete()
+          .eq('id', projectId);
+        
+        if (error) {
+          console.error('Error deleting project:', error);
+          showError('Failed to delete project. Please try again.');
+          return;
+        }
+        
+        projects = projects.filter(p => p.id !== projectId);
+        if (currentProjectId === projectId) { currentProjectId = null; switchView('dashboard'); }
+        else renderDashboard();
+      }
+    }
+    
+    function renderProjectDetail() {
+      const project = projects.find(p => p.id === currentProjectId);
+      if (!project) return;
+      const container = document.getElementById('projectDetail');
+      const progress = calculateProgress(project);
+      const isManual = project.manualProgressOverride !== null;
+      let html = `
+        <div class="detail-header">
+          <input type="text" class="editable-title" value="${escapeHtml(project.name)}" onchange="updateProjectField('name', this.value)">
+          <div class="detail-actions">
+            <button class="btn" onclick="exportProjectJSON()">Export JSON</button>
+            <button class="btn" onclick="importProjectJSON()">Import JSON</button>
+            <button class="btn btn-danger" onclick="deleteProject('${project.id}')">Delete Project</button>
+            <button class="btn" onclick="switchView('dashboard')">Back to Dashboard</button>
+          </div>
+        </div>`;
+      if (project.status === 'Problem') html += `<div class="problem-banner">⚠️ Project in Problem — Add Status Reason below</div>`;
+      html += `
+        <div class="metadata-grid">
+          <div class="field-group"><label class="field-label">Status</label><select class="field-value" onchange="updateProjectField('status', this.value)"><option value="Backlog" ${project.status === 'Backlog' ? 'selected' : ''}>Backlog</option><option value="On Track" ${project.status === 'On Track' ? 'selected' : ''}>On Track</option><option value="Delayed" ${project.status === 'Delayed' ? 'selected' : ''}>Delayed</option><option value="Problem" ${project.status === 'Problem' ? 'selected' : ''}>Problem</option><option value="Fully Complete" ${project.status === 'Fully Complete' ? 'selected' : ''}>Fully Complete</option></select></div>
+          <div class="field-group"><label class="field-label">Status Reason</label><input type="text" class="field-value" value="${escapeHtml(project.statusReason || '')}" onchange="updateProjectField('statusReason', this.value)"></div>
+          <div class="field-group"><label class="field-label">Project Managers</label><div class="multi-select-wrapper"><input type="text" id="projectManagersDisplay" class="field-value" readonly value="${project.projectManagers.join(', ') || ''}" placeholder="Select managers..." onclick="toggleProjectManagersDropdown()"><div id="projectManagersDropdown" class="multi-select-dropdown hidden">${PROJECT_MANAGERS.map(m => `<label><input type="checkbox" value="${m}" ${project.projectManagers.includes(m) ? 'checked' : ''} onchange="updateProjectManagersFromCheckboxes()"> ${m}</label>`).join('')}</div></div></div>
+          <div class="field-group"><label class="field-label">Key Stakeholders</label><input type="text" class="field-value" value="${escapeHtml((project.keyStakeholders || []).join(', '))}" placeholder="Enter stakeholders (comma-separated)" onchange="updateProjectKeyStakeholders(this.value)"></div>
+          <div class="field-group"><label class="field-label">Start Date</label><input type="date" class="field-value" value="${project.startDate}" onchange="updateProjectField('startDate', this.value)"></div>
+          <div class="field-group"><label class="field-label">Target Finish</label><input type="date" class="field-value" value="${project.targetFinish}" onchange="updateProjectField('targetFinish', this.value)"></div>
+        </div>
+        <div class="field-group" style="margin-bottom: 1.5rem;"><label class="field-label">Objective</label><textarea class="field-value" onchange="updateProjectField('objective', this.value)">${escapeHtml(project.objective || '')}</textarea></div>
+        <div class="progress-control">
+          <label class="field-label">Progress:</label>
+          <select onchange="setManualProgress(this.value)">${[0,10,20,30,40,50,60,70,80,90,100].map(val => `<option value="${val}" ${progress === val ? 'selected' : ''}>${val}%</option>`).join('')}</select>
+          <div class="progress-bar-container" style="flex: 1;"><div class="progress-bar-fill" style="width: ${progress}%"></div></div>
+          ${isManual ? '<span class="manual-badge">MANUAL</span><button class="btn btn-small" onclick="syncProgressToTasks()">Sync to Tasks</button>' : ''}
+        </div>
+        <div class="section"><h2 class="section-title">Files</h2><div style="margin-bottom: 1rem;"><button class="btn btn-small" onclick="addFileText()">Paste Text File</button><button class="btn btn-small" onclick="addFileURL()">Add URL</button></div><div class="files-list" id="filesList"></div></div>
+        <div class="section"><h2 class="section-title">Updates / Daily Logs</h2><textarea id="newUpdate" placeholder="Add an update..." style="margin-bottom: 0.5rem;"></textarea><button class="btn btn-primary" onclick="addUpdate()">Add Update</button><div class="updates-list" id="updatesList" style="margin-top: 1rem;"></div></div>
+        <div class="section"><h2 class="section-title">Tasks</h2><button class="btn btn-primary" onclick="addMainTask()">+ Add Main Task</button><ul class="task-list" id="taskList"></ul></div>`;
+      container.innerHTML = html;
+      renderFiles(); renderUpdates(); renderTasks();
+    }
+    
+    async function updateProjectField(field, value) {
+      const project = projects.find(p => p.id === currentProjectId);
+      if (project) { 
+        project[field] = value; 
+        if ((field === 'startDate' || field === 'targetFinish') && (!project.startDate || !project.targetFinish)) project.status = 'Backlog'; 
+        await saveSingleProject(project);
+        renderProjectDetail(); 
+      }
+    }
+    
+    function toggleProjectManagersDropdown() { document.getElementById('projectManagersDropdown').classList.toggle('hidden'); }
+    
+    async function updateProjectManagersFromCheckboxes() {
+      const project = projects.find(p => p.id === currentProjectId);
+      if (!project) return;
+      const checkboxes = document.querySelectorAll('#projectManagersDropdown input[type="checkbox"]');
+      project.projectManagers = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+      document.getElementById('projectManagersDisplay').value = project.projectManagers.join(', ');
+      await saveSingleProject(project);
+      document.addEventListener('click', function closeDropdown(e) { if (!e.target.closest('.multi-select-wrapper')) { document.getElementById('projectManagersDropdown').classList.add('hidden'); document.removeEventListener('click', closeDropdown); } });
+    }
+    
+    async function updateProjectKeyStakeholders(value) { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.keyStakeholders = value.split(',').map(s => s.trim()).filter(s => s); 
+        await saveSingleProject(project);
+      } 
+    }
+    async function setManualProgress(value) { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.manualProgressOverride = parseInt(value); 
+        await saveSingleProject(project);
+        renderProjectDetail(); 
+      } 
+    }
+    async function syncProgressToTasks() { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.manualProgressOverride = null; 
+        await saveSingleProject(project);
+        renderProjectDetail(); 
+      } 
+    }
+    
+    async function addFileText() { 
+      const title = prompt('Enter file title:'); 
+      if (!title) return; 
+      const content = prompt('Paste file content:'); 
+      if (content === null) return; 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.files.push({ id: generateId(), title, content, url: null, createdAt: new Date().toISOString() }); 
+        await saveSingleProject(project);
+        renderFiles(); 
+      } 
+    }
+    async function addFileURL() { 
+      const url = prompt('Enter file URL:'); 
+      if (!url) return; 
+      const title = prompt('Enter file title:') || url; 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.files.push({ id: generateId(), title, content: null, url, createdAt: new Date().toISOString() }); 
+        await saveSingleProject(project);
+        renderFiles(); 
+      } 
+    }
+    
+    function renderFiles() {
+      const project = projects.find(p => p.id === currentProjectId); if (!project) return;
+      const container = document.getElementById('filesList');
+      if (project.files.length === 0) { container.innerHTML = '<p style="color: #718096;">No files yet</p>'; return; }
+      container.innerHTML = project.files.map(file => `<div class="file-item"><div><div class="file-title">${escapeHtml(file.title)}</div><small style="color: #718096;">${formatDate(file.createdAt)}</small></div><div class="file-actions">${file.url ? `<a href="${escapeHtml(file.url)}" target="_blank" class="btn btn-small">Open</a>` : ''}${file.content ? `<button class="btn btn-small" onclick="copyFileContent('${file.id}')">Copy</button>` : ''}<button class="btn btn-small btn-danger" onclick="deleteFile('${file.id}')">Delete</button></div></div>`).join('');
+    }
+    
+    function copyFileContent(fileId) { const project = projects.find(p => p.id === currentProjectId); const file = project.files.find(f => f.id === fileId); if (file && file.content) { navigator.clipboard.writeText(file.content); alert('Content copied to clipboard!'); } }
+    async function deleteFile(fileId) { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.files = project.files.filter(f => f.id !== fileId); 
+        await saveSingleProject(project);
+        renderFiles(); 
+      } 
+    }
+    
+    async function addUpdate() { 
+      const text = document.getElementById('newUpdate').value.trim(); 
+      if (!text) return; 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (project) { 
+        project.updates.unshift({ id: generateId(), text, timestamp: new Date().toISOString() }); 
+        await saveSingleProject(project);
+        document.getElementById('newUpdate').value = ''; 
+        renderUpdates(); 
+      } 
+    }
+    
+    async function deleteUpdate(updateId) {
+      const project = projects.find(p => p.id === currentProjectId);
+      if (!project) return;
+      if (confirm('Are you sure you want to delete this update?')) {
+        project.updates = project.updates.filter(u => u.id !== updateId);
+        await saveSingleProject(project);
+        renderUpdates();
+      }
+    }
+    
+    function renderUpdates() {
+      const project = projects.find(p => p.id === currentProjectId); if (!project) return;
+      const container = document.getElementById('updatesList');
+      if (project.updates.length === 0) { container.innerHTML = '<p style="color: #718096;">No updates yet</p>'; return; }
+      container.innerHTML = project.updates.map(update => `<div class="update-item"><div style="display: flex; justify-content: space-between; align-items: flex-start;"><div><div class="update-date">${formatDateTime(update.timestamp)}</div><div class="update-text">${escapeHtml(update.text)}</div></div><button class="btn btn-small btn-danger" onclick="deleteUpdate('${update.id}')" style="margin-left: 0.5rem; flex-shrink: 0;" title="Delete update">×</button></div></div>`).join('');
+    }
+    
+    function renderTasks() { const project = projects.find(p => p.id === currentProjectId); if (!project) return; const container = document.getElementById('taskList'); container.innerHTML = ''; project.tasks.forEach((task, index) => renderTaskItem(container, task, index + 1, '', 0)); }
+    
+    function renderTaskItem(container, task, index, parentLabel, depth) {
+      const li = document.createElement('li'); li.className = 'task-item'; li.style.marginLeft = `${depth * 2}rem`; li.dataset.taskId = task.id;
+      const isDone = task.status === 'Done';
+      li.innerHTML = `
+        <div class="task-header">
+          <input type="checkbox" class="task-checkbox" ${isDone ? 'checked' : ''} onchange="toggleTaskDone('${task.id}')">
+          <span class="task-label">${task.autoLabel}</span>
+          <input type="text" class="task-title-input" value="${escapeHtml(task.title)}" onchange="updateTaskField('${task.id}', 'title', this.value)">
+          <div class="task-actions">
+            <button class="btn btn-small" onclick="editTaskDetails('${task.id}')">✎</button>
+            <button class="btn btn-small" onclick="addSubtask('${task.id}')">+</button>
+            <button class="btn btn-small" onclick="moveTaskUp('${task.id}')">↑</button>
+            <button class="btn btn-small" onclick="moveTaskDown('${task.id}')">↓</button>
+            <button class="btn btn-small btn-danger" onclick="deleteTask('${task.id}')">−</button>
+            ${task.subtasks.length > 0 ? `<button class="collapse-btn" onclick="toggleSubtasks('${task.id}')">▼</button>` : ''}
+          </div>
+        </div>
+        <div class="task-details">
+          <div class="task-detail-field"><label class="task-detail-label">Assignee</label><input type="text" value="${escapeHtml(task.assignee || '')}" onchange="updateTaskField('${task.id}', 'assignee', this.value)"></div>
+          <div class="task-detail-field"><label class="task-detail-label">Start Date</label><input type="date" value="${task.startDate}" onchange="updateTaskField('${task.id}', 'startDate', this.value)"></div>
+          <div class="task-detail-field"><label class="task-detail-label">Target Finish</label><input type="date" value="${task.targetFinish}" onchange="updateTaskField('${task.id}', 'targetFinish', this.value)"></div>
+          <div class="task-detail-field"><label class="task-detail-label">Status</label><select onchange="updateTaskField('${task.id}', 'status', this.value)"><option value="Backlog" ${task.status === 'Backlog' ? 'selected' : ''}>Backlog</option><option value="To Do" ${task.status === 'To Do' ? 'selected' : ''}>To Do</option><option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option><option value="Blocked" ${task.status === 'Blocked' ? 'selected' : ''}>Blocked</option><option value="Done" ${task.status === 'Done' ? 'selected' : ''}>Done</option></select></div>
+          <div class="task-detail-field"><label class="task-detail-label">Priority</label><select onchange="updateTaskField('${task.id}', 'priority', this.value)"><option value="Low" ${task.priority === 'Low' ? 'selected' : ''}>Low</option><option value="Medium" ${task.priority === 'Medium' ? 'selected' : ''}>Medium</option><option value="High" ${task.priority === 'High' ? 'selected' : ''}>High</option></select></div>
+        </div>
+        ${depth === 0 ? `<div class="field-group" style="margin-top: 0.75rem;"><label class="task-detail-label">Success Criteria (Metrics & KPIs)</label><textarea class="field-value" style="min-height: 60px; font-size: 0.9rem;" placeholder="Enter relevant metrics and KPIs..." onchange="updateTaskField('${task.id}', 'successCriteria', this.value)">${escapeHtml(task.successCriteria || '')}</textarea></div>` : ''}`;
+      if (task.subtasks && task.subtasks.length > 0) { const subtasksContainer = document.createElement('div'); subtasksContainer.className = 'subtasks'; subtasksContainer.id = `subtasks-${task.id}`; task.subtasks.forEach((subtask, subIndex) => renderTaskItem(subtasksContainer, subtask, subIndex + 1, task.autoLabel, depth + 1)); li.appendChild(subtasksContainer); }
+      container.appendChild(li);
+    }
+    
+    function findTaskById(taskId, tasks) { if (!tasks || !Array.isArray(tasks)) return null; for (let task of tasks) { if (task.id === taskId) return { task, parent: null, tasks }; if (task.subtasks) { const found = findTaskById(taskId, task.subtasks); if (found) return { ...found, parent: task }; } } return null; }
+    
+    async function toggleTaskDone(taskId) {
+      const project = projects.find(p => p.id === currentProjectId); if (!project) return;
+      const found = findTaskById(taskId, project.tasks); if (!found) return;
+      const task = found.task; const wasDone = task.status === 'Done'; const hasSubtasks = task.subtasks && task.subtasks.length > 0; const incompleteSubtasks = hasSubtasks ? task.subtasks.filter(st => st.status !== 'Done') : [];
+      if (!wasDone && hasSubtasks && incompleteSubtasks.length > 0) { if (confirm('Mark parent complete and also mark all subtasks complete?')) { task.status = 'Done'; task.subtasks.forEach(st => st.status = 'Done'); } else task.status = 'Done'; }
+      else if (!wasDone) task.status = 'Done'; else task.status = 'To Do';
+      if (found.parent && found.parent.subtasks.every(st => st.status === 'Done')) found.parent.status = 'Done';
+      task.updatedAt = new Date().toISOString(); 
+      await saveSingleProject(project);
+      renderProjectDetail();
+    }
+    
+    async function updateTaskField(taskId, field, value) { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (!project) return; 
+      const found = findTaskById(taskId, project.tasks); 
+      if (!found) return; 
+      found.task[field] = value; 
+      found.task.updatedAt = new Date().toISOString(); 
+      await saveSingleProject(project);
+    }
+    
+    async function addMainTask() {
+      const project = projects.find(p => p.id === currentProjectId); if (!project) return;
+      const nextNum = project.tasks.length > 0 ? Math.max(...project.tasks.map(t => parseInt(t.autoLabel) || 0)) + 1 : 1;
+      const now = new Date();
+      project.tasks.push({ id: generateId(), autoLabel: nextNum.toString(), title: 'New Task', description: '', assignee: '', startDate: project.startDate, targetFinish: project.targetFinish, status: 'To Do', priority: 'Medium', tags: [], successCriteria: '', subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() });
+      await saveSingleProject(project);
+      renderProjectDetail();
+    }
+    
+    async function addSubtask(parentTaskId) {
+      const project = projects.find(p => p.id === currentProjectId); if (!project) return;
+      const found = findTaskById(parentTaskId, project.tasks); if (!found) return;
+      const parent = found.task; if (!parent.subtasks) parent.subtasks = [];
+      const existingLabels = parent.subtasks.map(st => st.autoLabel);
+      let nextLetter = 'a'; const charCodeA = 'a'.charCodeAt(0);
+      for (let i = 0; i < 26; i++) { const letter = String.fromCharCode(charCodeA + i); if (!existingLabels.includes(parent.autoLabel + letter)) { nextLetter = letter; break; } }
+      const now = new Date();
+      parent.subtasks.push({ id: generateId(), autoLabel: parent.autoLabel + nextLetter, title: 'New Subtask', description: '', assignee: '', startDate: parent.startDate, targetFinish: parent.targetFinish, status: 'To Do', priority: 'Medium', tags: [], successCriteria: '', subtasks: [], createdAt: now.toISOString(), updatedAt: now.toISOString() });
+      await saveSingleProject(project);
+      renderProjectDetail();
+    }
+    
+    async function deleteTask(taskId) {
+      const project = projects.find(p => p.id === currentProjectId); if (!project) return;
+      const found = findTaskById(taskId, project.tasks); if (!found) return;
+      const task = found.task; const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+      if (hasSubtasks && !confirm(`Delete task "${task.title}" and all ${task.subtasks.length} subtask(s)?`)) return;
+      if (found.parent) found.parent.subtasks = found.parent.subtasks.filter(t => t.id !== taskId);
+      else project.tasks = project.tasks.filter(t => t.id !== taskId);
+      renumberTasks(project.tasks); 
+      await saveSingleProject(project);
+      renderProjectDetail();
+    }
+    
+    function renumberTasks(tasks) { tasks.forEach((task, index) => { task.autoLabel = (index + 1).toString(); if (task.subtasks) task.subtasks.forEach((subtask, subIndex) => { subtask.autoLabel = task.autoLabel + String.fromCharCode('a'.charCodeAt(0) + subIndex); }); }); }
+    
+    async function moveTaskUp(taskId) { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (!project) return; 
+      const found = findTaskById(taskId, project.tasks); 
+      if (!found) return; 
+      const tasks = found.parent ? found.parent.subtasks : project.tasks; 
+      const index = tasks.findIndex(t => t.id === taskId); 
+      if (index > 0) { 
+        [tasks[index - 1], tasks[index]] = [tasks[index], tasks[index - 1]]; 
+        renumberTasks(tasks); 
+        await saveSingleProject(project);
+        renderProjectDetail(); 
+      } 
+    }
+    async function moveTaskDown(taskId) { 
+      const project = projects.find(p => p.id === currentProjectId); 
+      if (!project) return; 
+      const found = findTaskById(taskId, project.tasks); 
+      if (!found) return; 
+      const tasks = found.parent ? found.parent.subtasks : project.tasks; 
+      const index = tasks.findIndex(t => t.id === taskId); 
+      if (index < tasks.length - 1) { 
+        [tasks[index], tasks[index + 1]] = [tasks[index + 1], tasks[index]]; 
+        renumberTasks(tasks); 
+        await saveSingleProject(project);
+        renderProjectDetail(); 
+      } 
+    }
+    function toggleSubtasks(taskId) { const container = document.querySelector(`[data-task-id="${taskId}"] .subtasks`); if (container) container.style.display = container.style.display === 'none' ? 'block' : 'none'; }
+    
+    function editTaskDetails(taskId) { const project = projects.find(p => p.id === currentProjectId); if (!project) return; const found = findTaskById(taskId, project.tasks); if (!found) return; currentTaskEdit = found.task; document.getElementById('taskDescription').value = found.task.description || ''; document.getElementById('taskSuccessCriteria').value = found.task.successCriteria || ''; document.getElementById('taskTags').value = found.task.tags.join(', '); document.getElementById('taskEditModal').classList.add('active'); }
+    async function saveTaskEdit() { 
+      if (!currentTaskEdit) return; 
+      currentTaskEdit.description = document.getElementById('taskDescription').value; 
+      currentTaskEdit.successCriteria = document.getElementById('taskSuccessCriteria').value; 
+      currentTaskEdit.tags = document.getElementById('taskTags').value.split(',').map(t => t.trim()).filter(t => t); 
+      currentTaskEdit.updatedAt = new Date().toISOString(); 
+      const project = projects.find(p => p.id === currentProjectId);
+      if (project) {
+        await saveSingleProject(project);
+      }
+      closeTaskEditModal(); 
+      renderProjectDetail(); 
+    }
+    function closeTaskEditModal() { document.getElementById('taskEditModal').classList.remove('active'); currentTaskEdit = null; }
+    
+    function renderGantt() {
+      if (projects.length === 0) { document.getElementById('ganttContainer').innerHTML = '<p>No projects to display.</p>'; return; }
+      const projectsWithDates = projects.filter(p => p.startDate && p.targetFinish);
+      if (projectsWithDates.length === 0) { document.getElementById('ganttContainer').innerHTML = '<p>No projects with complete dates to display.</p>'; return; }
+      const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
+      let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime()))); let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
+      minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000); maxDate = new Date(maxDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const days = Math.ceil((maxDate - minDate) / (24 * 60 * 60 * 1000)); const dayWidth = Math.max(20, 800 / days);
+      let html = '<div class="gantt-chart"><div class="gantt-header"><div class="gantt-labels"><strong>Project</strong></div><div class="gantt-timeline">';
+      for (let d = 0; d < days; d++) { const date = new Date(minDate.getTime() + d * 24 * 60 * 60 * 1000); if (d % 7 === 0 || d === 0) html += `<div class="gantt-day" style="min-width: ${dayWidth * 7}px;">${formatDate(date.toISOString().split('T')[0])}</div>`; }
+      html += '</div></div>';
+      projectsWithDates.forEach(project => { const start = new Date(project.startDate); const end = new Date(project.targetFinish); const startOffset = (start - minDate) / (24 * 60 * 60 * 1000); const duration = (end - start) / (24 * 60 * 60 * 1000); html += `<div class="gantt-row"><div class="gantt-task-label">${escapeHtml(project.name)}</div><div class="gantt-task-bar-container"><div class="gantt-task-bar" style="left: ${startOffset * dayWidth}px; width: ${duration * dayWidth}px;" onclick="openProject('${project.id}');">${escapeHtml(project.name)}</div></div></div>`; });
+      html += '</div>'; document.getElementById('ganttContainer').innerHTML = html;
+    }
+    
+    async function renderKanban() {
+      if (projects.length === 0) { document.getElementById('kanbanBoard').innerHTML = '<p>No projects to display.</p>'; return; }
+      let needsSave = false;
+      projects.forEach(project => { if (!project.startDate || !project.targetFinish) { project.status = 'Backlog'; needsSave = true; } }); 
+      if (needsSave) await saveProjects();
+      const columns = ['Backlog', 'On Track', 'Delayed', 'Problem', 'Fully Complete'];
+      let html = '';
+      columns.forEach(column => {
+        const columnProjects = projects.filter(p => { if (!p.startDate || !p.targetFinish) return column === 'Backlog'; return p.status === column; });
+        html += `<div class="kanban-column"><div class="kanban-header">${column} (${columnProjects.length})</div>`;
+        columnProjects.forEach(project => { const progress = calculateProgress(project); html += `<div class="kanban-card" onclick="openProject('${project.id}');"><div class="kanban-card-title">${escapeHtml(project.name)}</div><div class="kanban-card-meta"><span>PM: ${project.projectManagers.join(', ') || 'None'}</span>${project.startDate && project.targetFinish ? `<span>${progress}%</span>` : '<span style="color: #718096;">No dates</span>'}</div>${project.startDate && project.targetFinish ? `<div class="progress-bar-container" style="margin-top: 0.5rem; height: 6px;"><div class="progress-bar-fill" style="width: ${progress}%"></div></div>` : ''}</div>`; });
+        html += '</div>';
+      });
+      document.getElementById('kanbanBoard').innerHTML = html;
+    }
+    
+    function exportProjectJSON() { const project = projects.find(p => p.id === currentProjectId); if (!project) return; const json = JSON.stringify(project, null, 2); const blob = new Blob([json], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${project.name.replace(/[^a-z0-9]/gi, '_')}.json`; a.click(); URL.revokeObjectURL(url); }
+    async function importProjectJSON() { 
+      const json = prompt('Paste project JSON:'); 
+      if (!json) return; 
+      try { 
+        const imported = JSON.parse(json); 
+        const project = projects.find(p => p.id === currentProjectId); 
+        if (project) { 
+          Object.assign(project, imported); 
+          project.id = currentProjectId; 
+          await saveSingleProject(project);
+          renderProjectDetail(); 
+          alert('Project imported successfully!'); 
+        } 
+      } catch (e) { 
+        alert('Invalid JSON: ' + e.message); 
+      } 
+    }
+    
+    function showAddProjectModal() { document.getElementById('addProjectModal').classList.add('active'); }
+    function closeAddProjectModal() { document.getElementById('addProjectModal').classList.remove('active'); document.getElementById('newProjectName').value = ''; document.getElementById('newProjectObjective').value = ''; document.getElementById('newProjectManagers').selectedIndex = -1; }
+    async function createNewProject() {
+      const name = document.getElementById('newProjectName').value.trim(); if (!name) { alert('Please enter a project name'); return; }
+      const objective = document.getElementById('newProjectObjective').value.trim();
+      const managers = Array.from(document.getElementById('newProjectManagers').selectedOptions).map(o => o.value);
+      const now = new Date(); const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const newProject = { id: generateId(), name, status: 'On Track', statusReason: '', projectManagers: managers.length > 0 ? managers : [], keyStakeholders: [], objective, startDate: now.toISOString().split('T')[0], targetFinish: futureDate.toISOString().split('T')[0], submissionDate: '', files: [], updates: [], tasks: [], manualProgressOverride: null };
+      projects.push(newProject);
+      await saveSingleProject(newProject);
+      closeAddProjectModal(); 
+      renderDashboard();
+    }
+    
+    let confirmCallback = null;
+    function showConfirm(message, callback) { document.getElementById('confirmMessage').textContent = message; document.getElementById('confirmModal').classList.add('active'); confirmCallback = callback; }
+    function closeConfirmModal() { document.getElementById('confirmModal').classList.remove('active'); confirmCallback = null; }
+    document.getElementById('confirmYes').onclick = function() { if (confirmCallback) { confirmCallback(); closeConfirmModal(); } };
+    
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    function formatDate(dateString) { if (!dateString) return ''; const date = new Date(dateString); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    function formatDateTime(isoString) { const date = new Date(isoString); return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+    
+    init();
+  </script>
+</body>
+</html>
