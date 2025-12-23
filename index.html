@@ -207,6 +207,10 @@
     </div>
     
     <div id="ganttView" class="hidden">
+      <div class="view-toggle" style="margin-bottom: 1rem;" id="ganttViewToggle">
+        <button class="btn active" onclick="setGanttViewType('biweekly')" id="ganttBiweeklyBtn">2-Week View</button>
+        <button class="btn" onclick="setGanttViewType('monthly')" id="ganttMonthlyBtn">Monthly View</button>
+      </div>
       <div class="gantt-container" id="ganttContainer"></div>
     </div>
     
@@ -321,6 +325,7 @@
     let currentTaskEdit = null;
     let selectedManagers = [];
     let isLoading = false;
+    let ganttViewType = 'biweekly'; // 'biweekly' or 'monthly'
     
     const logoSVG = `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="8" fill="#3182CE"/><path d="M24 10L34 30H28L24 22L20 30H14L24 10Z" fill="white"/><path d="M18 34L24 38L30 34H18Z" fill="white"/></svg>`;
     
@@ -991,19 +996,75 @@
     }
     function closeTaskEditModal() { document.getElementById('taskEditModal').classList.remove('active'); currentTaskEdit = null; }
     
+    function setGanttViewType(type) {
+      ganttViewType = type;
+      // Update tab buttons
+      document.getElementById('ganttBiweeklyBtn').classList.toggle('active', type === 'biweekly');
+      document.getElementById('ganttMonthlyBtn').classList.toggle('active', type === 'monthly');
+      renderGantt();
+    }
+    
     function renderGantt() {
       if (projects.length === 0) { document.getElementById('ganttContainer').innerHTML = '<p>No projects to display.</p>'; return; }
       const projectsWithDates = projects.filter(p => p.startDate && p.targetFinish);
       if (projectsWithDates.length === 0) { document.getElementById('ganttContainer').innerHTML = '<p>No projects with complete dates to display.</p>'; return; }
       const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
-      let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime()))); let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
-      minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000); maxDate = new Date(maxDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const days = Math.ceil((maxDate - minDate) / (24 * 60 * 60 * 1000)); const dayWidth = Math.max(20, 800 / days);
+      let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime()))); 
+      let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
+      
+      // Calculate increment based on view type
+      let incrementDays, incrementLabel;
+      if (ganttViewType === 'biweekly') {
+        incrementDays = 14; // 2 weeks
+        incrementLabel = '2 weeks';
+        minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000); // Add 1 week buffer
+        maxDate = new Date(maxDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      } else { // monthly
+        incrementDays = 30; // ~1 month
+        incrementLabel = 'month';
+        // Round to start of month
+        minDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+        // Add buffer months
+        minDate = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+        maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
+      }
+      
+      const totalDays = Math.ceil((maxDate - minDate) / (24 * 60 * 60 * 1000));
+      const increments = Math.ceil(totalDays / incrementDays);
+      const incrementWidth = Math.max(100, 1200 / increments);
+      
       let html = '<div class="gantt-chart"><div class="gantt-header"><div class="gantt-labels"><strong>Project</strong></div><div class="gantt-timeline">';
-      for (let d = 0; d < days; d++) { const date = new Date(minDate.getTime() + d * 24 * 60 * 60 * 1000); if (d % 7 === 0 || d === 0) html += `<div class="gantt-day" style="min-width: ${dayWidth * 7}px;">${formatDate(date.toISOString().split('T')[0])}</div>`; }
+      
+      // Generate header increments
+      for (let i = 0; i < increments; i++) {
+        const incrementStart = new Date(minDate.getTime() + i * incrementDays * 24 * 60 * 60 * 1000);
+        let label;
+        if (ganttViewType === 'biweekly') {
+          label = formatDate(incrementStart.toISOString().split('T')[0]);
+        } else {
+          // Monthly view - show month and year
+          label = incrementStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        }
+        html += `<div class="gantt-day" style="min-width: ${incrementWidth}px;">${label}</div>`;
+      }
+      
       html += '</div></div>';
-      projectsWithDates.forEach(project => { const start = new Date(project.startDate); const end = new Date(project.targetFinish); const startOffset = (start - minDate) / (24 * 60 * 60 * 1000); const duration = (end - start) / (24 * 60 * 60 * 1000); html += `<div class="gantt-row"><div class="gantt-task-label">${escapeHtml(project.name)}</div><div class="gantt-task-bar-container"><div class="gantt-task-bar" style="left: ${startOffset * dayWidth}px; width: ${duration * dayWidth}px;" onclick="openProject('${project.id}');">${escapeHtml(project.name)}</div></div></div>`; });
-      html += '</div>'; document.getElementById('ganttContainer').innerHTML = html;
+      
+      // Render project bars
+      projectsWithDates.forEach(project => {
+        const start = new Date(project.startDate);
+        const end = new Date(project.targetFinish);
+        const startOffset = (start - minDate) / (24 * 60 * 60 * 1000);
+        const duration = (end - start) / (24 * 60 * 60 * 1000);
+        const leftPosition = (startOffset / incrementDays) * incrementWidth;
+        const barWidth = (duration / incrementDays) * incrementWidth;
+        
+        html += `<div class="gantt-row"><div class="gantt-task-label">${escapeHtml(project.name)}</div><div class="gantt-task-bar-container"><div class="gantt-task-bar" style="left: ${leftPosition}px; width: ${Math.max(barWidth, 50)}px;" onclick="openProject('${project.id}');">${escapeHtml(project.name)}</div></div></div>`;
+      });
+      
+      html += '</div>';
+      document.getElementById('ganttContainer').innerHTML = html;
     }
     
     async function renderKanban() {
