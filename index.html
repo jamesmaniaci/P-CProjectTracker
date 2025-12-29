@@ -96,6 +96,9 @@
     .gantt-labels { width: 200px; flex-shrink: 0; }
     .gantt-timeline { flex: 1; display: flex; }
     .gantt-day { flex: 1; text-align: center; font-size: 0.75rem; color: #718096; border-left: 1px solid #e2e8f0; padding: 0.25rem; }
+    .gantt-day.sprint-odd { background: #f0f9ff; }
+    .gantt-day.sprint-even { background: #fefcbf; }
+    .gantt-day.sprint-start { border-left: 3px solid #3182ce !important; font-weight: 600; }
     .gantt-row { display: flex; align-items: center; min-height: 60px; border-bottom: 1px solid #e2e8f0; }
     .gantt-task-label { width: 200px; flex-shrink: 0; padding: 0.5rem; font-size: 0.85rem; }
     .gantt-task-bar-container { flex: 1; position: relative; height: 50px; }
@@ -113,6 +116,12 @@
     .calendar-day-number { font-size: 0.75rem; color: #2d3748; margin-bottom: 0.25rem; font-weight: 600; }
     .calendar-day.today { background: #ebf8ff; }
     .calendar-day.today .calendar-day-number { font-weight: 700; color: #3182ce; }
+    .calendar-day.sprint-odd { background: #f0f9ff; }
+    .calendar-day.sprint-even { background: #fefcbf; }
+    .calendar-day.sprint-odd.other-month { background: #f0f9ff; opacity: 0.6; }
+    .calendar-day.sprint-even.other-month { background: #fefcbf; opacity: 0.6; }
+    .calendar-day.today.sprint-odd { background: #bee3f8; }
+    .calendar-day.today.sprint-even { background: #faf089; }
     .calendar-project-item { margin-top: 0.25rem; padding: 0.25rem 0.5rem; background: #4299e1; border-radius: 3px; font-size: 0.75rem; color: white; cursor: pointer; word-wrap: break-word; white-space: normal; line-height: 1.3; }
     .calendar-project-item:hover { background: #3182ce; }
     .calendar-projects-list { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -1033,40 +1042,46 @@
     
     function renderBiweeklyView(projectsWithDates) {
       const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
-      let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime()))); 
+      let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime())));
       let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
-      
-      const incrementDays = 14; // 2 weeks
-      minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000); // Add 1 week buffer
+
+      // Add buffer
+      minDate = new Date(minDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       maxDate = new Date(maxDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-      
+
       const totalDays = Math.ceil((maxDate - minDate) / (24 * 60 * 60 * 1000));
-      const increments = Math.ceil(totalDays / incrementDays);
-      const incrementWidth = Math.max(100, 1200 / increments);
-      
+      const dayWidth = Math.max(30, 1200 / totalDays);
+
       let html = '<div class="gantt-chart"><div class="gantt-header"><div class="gantt-labels"><strong>Project</strong></div><div class="gantt-timeline">';
-      
-      // Generate header increments
-      for (let i = 0; i < increments; i++) {
-        const incrementStart = new Date(minDate.getTime() + i * incrementDays * 24 * 60 * 60 * 1000);
-        const label = formatDate(incrementStart.toISOString().split('T')[0]);
-        html += `<div class="gantt-day" style="min-width: ${incrementWidth}px;">${label}</div>`;
+
+      // Generate header for each day
+      let previousSprintClass = '';
+      for (let d = 0; d < totalDays; d++) {
+        const date = new Date(minDate.getTime() + d * 24 * 60 * 60 * 1000);
+        const sprintClass = getSprintClass(date);
+        const isSprintStart = d === 0 || sprintClass !== previousSprintClass; // Sprint starts when class changes
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayNum = date.getDate();
+
+        html += `<div class="gantt-day ${sprintClass} ${isSprintStart ? 'sprint-start' : ''}" style="min-width: ${dayWidth}px;" title="${date.toLocaleDateString()}">${dayName} ${dayNum}</div>`;
+        
+        previousSprintClass = sprintClass;
       }
-      
+
       html += '</div></div>';
-      
+
       // Render project bars
       projectsWithDates.forEach(project => {
         const start = new Date(project.startDate);
         const end = new Date(project.targetFinish);
         const startOffset = (start - minDate) / (24 * 60 * 60 * 1000);
         const duration = (end - start) / (24 * 60 * 60 * 1000);
-        const leftPosition = (startOffset / incrementDays) * incrementWidth;
-        const barWidth = (duration / incrementDays) * incrementWidth;
-        
-        html += `<div class="gantt-row"><div class="gantt-task-label">${escapeHtml(project.name)}</div><div class="gantt-task-bar-container"><div class="gantt-task-bar" style="left: ${leftPosition}px; width: ${Math.max(barWidth, 50)}px;" onclick="openProject('${project.id}');">${escapeHtml(project.name)}</div></div></div>`;
+        const leftPosition = startOffset * dayWidth;
+        const barWidth = Math.max(duration * dayWidth, 50);
+
+        html += `<div class="gantt-row"><div class="gantt-task-label">${escapeHtml(project.name)}</div><div class="gantt-task-bar-container"><div class="gantt-task-bar" style="left: ${leftPosition}px; width: ${barWidth}px;" onclick="openProject('${project.id}');">${escapeHtml(project.name)}</div></div></div>`;
       });
-      
+
       html += '</div>';
       document.getElementById('ganttContainer').innerHTML = html;
     }
@@ -1111,7 +1126,8 @@
         // Empty cells for days before month starts
         for (let i = 0; i < startDayOfWeek; i++) {
           const prevMonthDate = new Date(year, month, -i);
-          html += `<div class="calendar-day other-month"><div class="calendar-day-number">${prevMonthDate.getDate()}</div></div>`;
+          const sprintClass = getSprintClass(prevMonthDate);
+          html += `<div class="calendar-day other-month ${sprintClass}"><div class="calendar-day-number">${prevMonthDate.getDate()}</div></div>`;
         }
         
         // Days of the month
@@ -1120,8 +1136,9 @@
           date.setHours(0, 0, 0, 0);
           const isToday = date.getTime() === today.getTime();
           const dateStr = date.toISOString().split('T')[0];
+          const sprintClass = getSprintClass(date);
           
-          html += `<div class="calendar-day ${isToday ? 'today' : ''}" data-date="${dateStr}">`;
+          html += `<div class="calendar-day ${isToday ? 'today' : ''} ${sprintClass}" data-date="${dateStr}">`;
           html += `<div class="calendar-day-number">${day}</div>`;
           
           // Add projects that have target finish date on this day
@@ -1152,7 +1169,8 @@
         if (remainingCells < 7) {
           for (let i = 1; i <= remainingCells; i++) {
             const nextMonthDate = new Date(year, month + 1, i);
-            html += `<div class="calendar-day other-month"><div class="calendar-day-number">${nextMonthDate.getDate()}</div></div>`;
+            const sprintClass = getSprintClass(nextMonthDate);
+            html += `<div class="calendar-day other-month ${sprintClass}"><div class="calendar-day-number">${nextMonthDate.getDate()}</div></div>`;
           }
         }
         
@@ -1169,6 +1187,24 @@
     function getProjectColor(index) {
       const colors = ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f56565', '#38b2ac', '#ed64a6'];
       return colors[index % colors.length];
+    }
+    
+    function getSprintClass(date) {
+      // Find the first Sunday of the month containing this date
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const firstDayOfMonth = new Date(year, month, 1);
+      const firstDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Calculate days to first Sunday
+      const daysToFirstSunday = firstDayOfWeek === 0 ? 0 : 7 - firstDayOfWeek;
+      const firstSunday = new Date(year, month, 1 + daysToFirstSunday);
+      
+      // Calculate days from first Sunday of the month
+      const daysDiff = Math.floor((date - firstSunday) / (24 * 60 * 60 * 1000));
+      const sprintNumber = Math.floor(daysDiff / 14);
+      
+      return sprintNumber % 2 === 0 ? 'sprint-even' : 'sprint-odd';
     }
     
     async function renderKanban() {
