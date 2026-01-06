@@ -1041,7 +1041,12 @@
     }
     
     function renderBiweeklyView(projectsWithDates) {
-      const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
+      // Parse dates as local dates to avoid timezone offset issues
+      const projectDates = projectsWithDates.map(p => {
+        const start = parseLocalDate(p.startDate);
+        const end = parseLocalDate(p.targetFinish);
+        return { start, end };
+      });
       let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime())));
       let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
 
@@ -1072,8 +1077,8 @@
 
       // Render project bars
       projectsWithDates.forEach(project => {
-        const start = new Date(project.startDate);
-        const end = new Date(project.targetFinish);
+        const start = parseLocalDate(project.startDate);
+        const end = parseLocalDate(project.targetFinish);
         const startOffset = (start - minDate) / (24 * 60 * 60 * 1000);
         const duration = (end - start) / (24 * 60 * 60 * 1000);
         const leftPosition = startOffset * dayWidth;
@@ -1087,7 +1092,7 @@
     }
     
     function renderCalendarView(projectsWithDates) {
-      const projectDates = projectsWithDates.map(p => ({ start: new Date(p.startDate), end: new Date(p.targetFinish) }));
+      const projectDates = projectsWithDates.map(p => ({ start: parseLocalDate(p.startDate), end: parseLocalDate(p.targetFinish) }));
       let minDate = new Date(Math.min(...projectDates.map(p => p.start.getTime())));
       let maxDate = new Date(Math.max(...projectDates.map(p => p.end.getTime())));
       
@@ -1151,7 +1156,7 @@
           // Add projects that have target finish date on this day
           const projectsOnThisDay = [];
           projectsWithDates.forEach((project, idx) => {
-            const projectTargetFinish = new Date(project.targetFinish);
+            const projectTargetFinish = parseLocalDate(project.targetFinish);
             projectTargetFinish.setHours(0, 0, 0, 0);
             
             if (date.getTime() === projectTargetFinish.getTime()) {
@@ -1194,6 +1199,14 @@
     function getProjectColor(index) {
       const colors = ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f56565', '#38b2ac', '#ed64a6'];
       return colors[index % colors.length];
+    }
+    
+    function parseLocalDate(dateString) {
+      // Parse ISO date string as local date to avoid timezone offset issues
+      // Input format: "YYYY-MM-DD"
+      if (!dateString) return null;
+      const parts = dateString.split('-');
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
     }
     
     function getSprintClass(date) {
@@ -1269,7 +1282,7 @@
     document.getElementById('confirmYes').onclick = function() { if (confirmCallback) { confirmCallback(); closeConfirmModal(); } };
     
     function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
-    function formatDate(dateString) { if (!dateString) return ''; const date = new Date(dateString); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    function formatDate(dateString) { if (!dateString) return ''; const date = parseLocalDate(dateString); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
     function formatDateTime(isoString) { const date = new Date(isoString); return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
     
     init();
