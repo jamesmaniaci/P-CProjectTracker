@@ -268,10 +268,6 @@
         <textarea id="taskDescription"></textarea>
       </div>
       <div class="field-group" style="margin-top: 1rem;">
-        <label class="field-label">Success Criteria (Metrics & KPIs)</label>
-        <textarea id="taskSuccessCriteria" placeholder="Enter relevant metrics and KPIs for this task..."></textarea>
-      </div>
-      <div class="field-group" style="margin-top: 1rem;">
         <label class="field-label">Tags (comma-separated)</label>
         <input type="text" id="taskTags">
       </div>
@@ -909,7 +905,7 @@
           <div class="task-detail-field"><label class="task-detail-label">Status</label><select onchange="updateTaskField('${task.id}', 'status', this.value)"><option value="Backlog" ${task.status === 'Backlog' ? 'selected' : ''}>Backlog</option><option value="To Do" ${task.status === 'To Do' ? 'selected' : ''}>To Do</option><option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option><option value="Blocked" ${task.status === 'Blocked' ? 'selected' : ''}>Blocked</option><option value="Done" ${task.status === 'Done' ? 'selected' : ''}>Done</option></select></div>
           <div class="task-detail-field"><label class="task-detail-label">Priority</label><select onchange="updateTaskField('${task.id}', 'priority', this.value)"><option value="Low" ${task.priority === 'Low' ? 'selected' : ''}>Low</option><option value="Medium" ${task.priority === 'Medium' ? 'selected' : ''}>Medium</option><option value="High" ${task.priority === 'High' ? 'selected' : ''}>High</option></select></div>
         </div>
-        ${depth === 0 ? `<div class="field-group" style="margin-top: 0.75rem;"><label class="task-detail-label">Success Criteria (Metrics & KPIs)</label><textarea class="field-value" style="min-height: 60px; font-size: 0.9rem;" placeholder="Enter relevant metrics and KPIs..." onchange="updateTaskField('${task.id}', 'successCriteria', this.value)">${escapeHtml(task.successCriteria || '')}</textarea></div>` : ''}`;
+        `;
       if (task.subtasks && task.subtasks.length > 0) { const subtasksContainer = document.createElement('div'); subtasksContainer.className = 'subtasks'; subtasksContainer.id = `subtasks-${task.id}`; task.subtasks.forEach((subtask, subIndex) => renderTaskItem(subtasksContainer, subtask, subIndex + 1, task.autoLabel, depth + 1)); li.appendChild(subtasksContainer); }
       container.appendChild(li);
     }
